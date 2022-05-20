@@ -55,7 +55,7 @@ func (h *handler) AddTransaction(w io.Writer, r *http.Request) response {
 		}
 	}
 
-	log.Printf("Adding transaction to the blockchain...\n")
+	log.Printf("dfaadsfdasAdding transaction to the blockchain...\n")
 
 	var tx Transaction
 	err := json.NewDecoder(r.Body).Decode(&tx)
@@ -76,15 +76,11 @@ func (h *handler) AddTransaction(w io.Writer, r *http.Request) response {
 }
 
 func (h *handler) Mine(w io.Writer, r *http.Request) response {
-	if r.Method != http.MethodGet {
-		return response{
-			nil,
-			http.StatusMethodNotAllowed,
-			fmt.Errorf("method %s not allowd", r.Method),
-		}
-	}
 
-	log.Println("Mining some coins")
+	log.Println("Before mining, resolving blockchain differences by consensus")
+	h.blockchain.ResolveConflicts()
+
+	log.Println("vczvfadfdadfdMining some coins")
 
 	// We run the proof of work algorithm to get the next proof...
 	lastBlock := h.blockchain.LastBlock()
@@ -111,7 +107,7 @@ func (h *handler) Blockchain(w io.Writer, r *http.Request) response {
 			fmt.Errorf("method %s not allowd", r.Method),
 		}
 	}
-	log.Println("Blockchain requested")
+	log.Println("fdafdafBlockchain requested")
 
 	resp := map[string]interface{}{"chain": h.blockchain.chain, "length": len(h.blockchain.chain)}
 	return response{resp, http.StatusOK, nil}
@@ -126,7 +122,7 @@ func (h *handler) RegisterNode(w io.Writer, r *http.Request) response {
 		}
 	}
 
-	log.Println("Adding node to the blockchain")
+	log.Println("afsdafAdding node to the blockchain")
 
 	var body map[string][]string
 	err := json.NewDecoder(r.Body).Decode(&body)
