@@ -32,12 +32,12 @@ type BlockchainService interface {
 	LastBlock() Block
 
 	// Simple Proof of Work Algorithm:
-	// - Find a number p' such that hash(pp') contains leading 4 zeroes, where p is the previous p'
+	// - Find a number p' such that hash(p, p') contains leading 4 zeroes, where p is the previous p'
 	// - p is the previous proof, and p' is the new proof
 	ProofOfWork(lastProof int64)
 
 	// Validates the Proof: Does hash(lastProof, proof) contain 4 leading zeroes?
-	VerifyProof(lastProof, proof int64) bool
+	ValidProof(lastProof, proof int64) bool
 }
 
 type Block struct {
@@ -52,6 +52,7 @@ type Transaction struct {
 	Sender    string `json:"sender"`
 	Recipient string `json:"recipient"`
 	Amount    int64  `json:"amount"`
+	Fee       int64  `json:"fee"`	// Improvement (1): We introduce the transaction fee.
 }
 
 type Blockchain struct {
@@ -91,16 +92,32 @@ func (bc *Blockchain) LastBlock() Block {
 
 func (bc *Blockchain) ProofOfWork(lastProof int64) int64 {
 	var proof int64 = 0
-	for !bc.ValidProof(lastProof, proof) {
+	authority := true
+
+	// Improvement (2): Concurrently keeping an eye on whether the blockchain needs an update,
+	// interrupt the puzzle-solving procedure if an update is needed.
+	go func(auth *bool, bc *Blockchain) {
+		for !bc.ValidProof(lastProof, proof) && *auth {
+			time.Sleep(1*time.Second)	
+			*auth = !bc.ResolveConflicts()
+		}
+	} (&authority, bc)
+
+	for !bc.ValidProof(lastProof, proof) && authority {
 		proof += 1
 	}
-	return proof
+	if authority {
+		return proof
+	} else {
+		return -1
+	}
+	
 }
 
 func (bc *Blockchain) ValidProof(lastProof, proof int64) bool {
 	guess := fmt.Sprintf("%d%d", lastProof, proof)
 	guessHash := ComputeHashSha256([]byte(guess))
-	return guessHash[:4] == "0000"
+	return guessHash[:6] == "000000"
 }
 
 func (bc *Blockchain) ValidChain(chain *[]Block) bool {
@@ -146,9 +163,10 @@ func (bc *Blockchain) ResolveConflicts() bool {
 		if anotherchain.Length > curmaxLength {
 			curmaxLength = anotherchain.Length
 			tempChain = anotherchain.Chain
+			authority = false
 		}
 	}
-	bc.chain = tempChain
+	bc.chain = tempChain	
 	return (!authority)
 }
 

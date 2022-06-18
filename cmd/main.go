@@ -3,7 +3,7 @@ package main
 import (
     "flag"
     "fmt"
-    "github.com/chenyizhang2000/gochain"
+    "gochain"
     "log"
     "net/http"
     "strings"

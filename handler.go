@@ -79,23 +79,48 @@ func (h *handler) Mine(w io.Writer, r *http.Request) response {
 
 	log.Println("Before mining, resolving blockchain differences by consensus")
 	h.blockchain.ResolveConflicts()
+	transactions := h.blockchain.transactions
 
-	log.Println(Mining some coins")
+	log.Println("Mining some coins")
+	var proof int64
 
-	// We run the proof of work algorithm to get the next proof...
-	lastBlock := h.blockchain.LastBlock()
-	lastProof := lastBlock.Proof
-	proof := h.blockchain.ProofOfWork(lastProof)
+	// Improvement (2) (3): Restart the ProofOfWork procedure if to-be-found proof is meaningless.
+	for {
+		// We run the proof of work algorithm to get the next proof...
+		lastBlock := h.blockchain.LastBlock()
+		lastProof := lastBlock.Proof
 
+		proof = h.blockchain.ProofOfWork(lastProof)
+
+		// Improvement (2): Restart the ProofOfWork procedure if the local chain has been replaced with an external chain.
+		if proof == -1 {
+			log.Println("Blockchain updated, proof-of-work restarted")
+			continue
+		}
+
+		// Improvement (3): Restart the ProofOfWork procedure if proof having been found is obsolete 
+		// (i.e., if the local chain has been updated before a proof is found).
+		if !h.blockchain.ValidProof(h.blockchain.LastBlock().Proof, proof) {
+			log.Println("Proof obsolete, proof-of-work restarted")
+			continue
+		} 
+		break
+	}
+	
+	// Improvement (1): The miner receives the transaction fee as a reward.
+	for _, tx := range transactions {
+		h.blockchain.NewTransaction(Transaction{Sender: tx.Sender, Recipient: h.nodeId, Amount: tx.Fee, Fee: 0})
+	}
 	// We must receive a reward for finding the proof.
 	// The sender is "0" to signify that this node has mined a new coin.
-	newTX := Transaction{Sender: "0", Recipient: h.nodeId, Amount: 1}
+	newTX := Transaction{Sender: "0", Recipient: h.nodeId, Amount: 1, Fee: 0}
 	h.blockchain.NewTransaction(newTX)
 
 	// Forge the new Block by adding it to the chain
 	block := h.blockchain.NewBlock(proof, "")
-
+	
 	resp := map[string]interface{}{"message": "New Block Forged", "block": block}
+	log.Println("New block forged")
 	return response{resp, http.StatusOK, nil}
 }
 
@@ -107,7 +132,6 @@ func (h *handler) Blockchain(w io.Writer, r *http.Request) response {
 			fmt.Errorf("method %s not allowd", r.Method),
 		}
 	}
-	log.Println("Blockchain requested")
 
 	resp := map[string]interface{}{"chain": h.blockchain.chain, "length": len(h.blockchain.chain)}
 	return response{resp, http.StatusOK, nil}
@@ -163,5 +187,6 @@ func (h *handler) ResolveConflicts(w io.Writer, r *http.Request) response {
 	}
 
 	resp := map[string]interface{}{"message": msg, "chain": h.blockchain.chain}
+	log.Println(msg)
 	return response{resp, http.StatusOK, nil}
 }

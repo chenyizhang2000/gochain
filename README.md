@@ -41,7 +41,8 @@ You can start as many nodes as you want with the following command
   {
     "sender": "sender-address-te33412uywq89234g",
     "recipient": "recipient-address-j3h45jk23hjk543gf",
-    "amount": 1000
+    "amount": 1000,
+    "fee": 10
   }
   ```
 
